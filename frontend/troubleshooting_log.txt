@@ -1,0 +1,12 @@
+[2025-03-20 21:15] 404错误排查记录
+1. 开发服务器已在5174端口启动
+2. 访问http://localhost:5174/返回404错误
+3. 已检查index.html文件，内容正常
+4. 检查vite配置发现端口不匹配问题
+5. 已修改vite.config.js：
+   - 将port从5173改为5174
+   - 将strictPort从true改为false
+6. 服务器已自动重启
+7. 检查App.svelte文件，路由配置正常
+8. 检查Landing组件，内容正常
+9. 下一步将检查vite的historyApiFallback配置

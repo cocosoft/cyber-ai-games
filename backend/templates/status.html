@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>服务器状态</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .status-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .status-card {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .status-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .status-item {
+            margin: 10px 0;
+            padding: 8px;
+            background-color: white;
+            border-radius: 4px;
+        }
+        .status-label {
+            font-weight: bold;
+            color: #666;
+        }
+        .status-value {
+            color: #333;
+        }
+        .status-health {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status-health.good {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status-health.warning {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status-health.critical {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="status-container">
+        <div class="status-header">
+            <h1>服务器运行状态</h1>
+            <p>最后更新时间: <span id="last-update">正在加载...</span></p>
+        </div>
+
+        <div class="status-grid">
+            <!-- 系统状态 -->
+            <div class="status-card">
+                <div class="status-title">系统状态</div>
+                <div class="status-item">
+                    <div class="status-label">运行时间</div>
+                    <div class="status-value" id="uptime">加载中...</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">CPU使用率</div>
+                    <div class="status-value" id="cpu-usage">加载中...</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">内存使用</div>
+                    <div class="status-value" id="memory-usage">加载中...</div>
+                </div>
+            </div>
+
+            <!-- 模型状态 -->
+            <div class="status-card">
+                <div class="status-title">模型状态</div>
+                <div id="models-status">
+                    <div class="status-item">
+                        <div>正在加载模型状态...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 服务状态 -->
+            <div class="status-card">
+                <div class="status-title">服务状态</div>
+                <div class="status-item">
+                    <div class="status-label">API服务</div>
+                    <div class="status-value">
+                        <span id="api-status" class="status-health">检测中...</span>
+                    </div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">数据库连接</div>
+                    <div class="status-value">
+                        <span id="db-status" class="status-health">检测中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取服务器状态
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/v1/status');
+                return response.json();
+            } catch (error) {
+                console.error('获取状态失败:', error);
+                return null;
+            }
+        }
+
+        // 更新状态显示
+        function updateStatus(data) {
+            // 更新系统状态
+            document.getElementById('uptime').textContent = data.system.uptime;
+            document.getElementById('cpu-usage').textContent = data.system.cpu_usage;
+            document.getElementById('memory-usage').textContent = data.system.memory_usage;
+
+            // 更新模型状态
+            const modelsContainer = document.getElementById('models-status');
+            modelsContainer.innerHTML = data.models.map(model => `
+                <div class="status-item">
+                    <div class="status-label">${model.name}</div>
+                    <div class="status-value">
+                        <span class="status-health ${model.status}">${model.status}</span>
+                        <div>优先级: ${model.priority}</div>
+                        <div>请求数: ${model.request_count}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // 更新服务状态
+            document.getElementById('api-status').textContent = data.services.api;
+            document.getElementById('api-status').className = `status-health ${data.services.api}`;
+            document.getElementById('db-status').textContent = data.services.database;
+            document.getElementById('db-status').className = `status-health ${data.services.database}`;
+
+            // 更新时间
+            document.getElementById('last-update').textContent = new Date().toLocaleString();
+        }
+
+        // 自动刷新状态
+        let refreshInterval;
+        function startAutoRefresh() {
+            refreshInterval = setInterval(async () => {
+                const status = await fetchStatus();
+                if (status) {
+                    updateStatus(status);
+                }
+            }, 5000);
+        }
+
+        function stopAutoRefresh() {
+            clearInterval(refreshInterval);
+        }
+
+        // 初始化
+        async function init() {
+            const status = await fetchStatus();
+            if (status) {
+                updateStatus(status);
+            }
+            startAutoRefresh();
+        }
+
+        // 页面加载时初始化
+        window.onload = init;
+        
+        // 页面卸载时停止自动刷新
+        window.onbeforeunload = stopAutoRefresh;
+    </script>
+</body>
+</html>

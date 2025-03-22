@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>大模型配置</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .config-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .model-list {
+            margin-bottom: 30px;
+        }
+        .model-card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .model-status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+        .model-status.active {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .model-status.inactive {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .model-actions button {
+            margin-left: 10px;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .add-model-form {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .submit-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .submit-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="config-container">
+        <h1>大模型配置</h1>
+        
+        <div class="model-list">
+            <h2>已配置模型</h2>
+            <div id="models-container"></div>
+        </div>
+
+        <div class="add-model-form">
+            <h2>添加新模型</h2>
+            <form id="add-model-form">
+                <div class="form-group">
+                    <label for="model-name">模型名称：</label>
+                    <select id="model-name" required>
+                        <option value="deepseek">DeepSeek</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="gemini">Gemini</option>
+                        <option value="baichuan">Baichuan</option>
+                        <option value="qwen">Qwen</option>
+                        <option value="zhipuai">ZhipuAI</option>
+                        <!-- 添加更多模型选项 -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="priority">优先级：</label>
+                    <input type="number" id="priority" min="1" value="1">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enabled" checked>
+                        立即启用
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="api-key">API密钥：</label>
+                    <input type="text" id="api-key" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="endpoint">调用地址：</label>
+                    <input type="text" id="endpoint">
+                </div>
+
+                <button type="submit" class="submit-btn">添加模型</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 获取模型状态
+        async function fetchModelStatus() {
+            const response = await fetch('/api/models/status');
+            return response.json();
+        }
+
+        // 更新模型列表显示
+        function renderModels(models) {
+            const container = document.getElementById('models-container');
+            container.innerHTML = models.map(model => `
+                <div class="model-card">
+                    <div class="model-info">
+                        <h3>${model.name}</h3>
+                        <div class="model-status ${model.enabled ? 'active' : 'inactive'}">
+                            ${model.enabled ? '已启用' : '未启用'}
+                        </div>
+                        <div class="model-config">
+                            <p>API Key: ${model.config.api_key ? '******' : '未配置'}</p>
+                            ${model.config.endpoint ? `<p>Endpoint: ${model.config.endpoint}</p>` : ''}
+                            <p>优先级: ${model.config.priority}</p>
+                        </div>
+                    </div>
+                    <div class="model-actions">
+                        ${model.enabled ? 
+                            `<button onclick="toggleModel('${model.name}', false)">禁用</button>` :
+                            `<button onclick="toggleModel('${model.name}', true)">启用</button>`
+                        }
+                        <button onclick="deleteModel('${model.name}')">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // 自动刷新模型状态
+        let refreshInterval;
+        function startAutoRefresh() {
+            refreshInterval = setInterval(async () => {
+                const models = await fetchModelStatus();
+                renderModels(models);
+            }, 5000);
+        }
+
+        function stopAutoRefresh() {
+            clearInterval(refreshInterval);
+        }
+
+        // 添加新模型
+        async function addModel(event) {
+            event.preventDefault();
+            const modelName = document.getElementById('model-name').value;
+            const apiKey = document.getElementById('api-key').value;
+            const endpoint = document.getElementById('endpoint').value;
+
+            const response = await fetch('/api/models', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    model_name: modelName,
+                    config: {
+                        api_key: apiKey,
+                        endpoint: endpoint,
+                        priority: parseInt(document.getElementById('priority').value),
+                        enabled: document.getElementById('enabled').checked
+                    }
+                })
+            });
+
+            if (response.ok) {
+                alert('模型添加成功');
+                init();
+            } else {
+                alert('模型添加失败');
+            }
+        }
+
+        // 启用/禁用模型
+        async function toggleModel(modelName, enable) {
+            const endpoint = enable ? 'enable' : 'disable';
+            const response = await fetch(`/api/models/${modelName}/${endpoint}`, {
+                method: 'PUT'
+            });
+
+            if (response.ok) {
+                alert(`模型${enable ? '启用' : '禁用'}成功`);
+                init();
+            } else {
+                alert(`模型${enable ? '启用' : '禁用'}失败`);
+            }
+        }
+
+        // 删除模型
+        async function deleteModel(modelName) {
+            if (confirm(`确定要删除模型 ${modelName} 吗？`)) {
+                const response = await fetch(`/api/models/${modelName}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert('模型删除成功');
+                    init();
+                } else {
+                    alert('模型删除失败');
+                }
+            }
+        }
+
+        // 初始化页面
+        async function init() {
+            const models = await fetchModelStatus();
+            renderModels(models);
+            startAutoRefresh();
+        }
+
+        // 绑定事件
+        document.getElementById('add-model-form').addEventListener('submit', addModel);
+
+        // 页面加载时初始化
+        window.onload = init;
+        
+        // 页面卸载时停止自动刷新
+        window.onbeforeunload = stopAutoRefresh;
+    </script>
+</body>
+</html>
